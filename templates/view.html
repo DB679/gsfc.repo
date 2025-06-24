@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4">Event Records</h2>
+<form method="POST" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="search" class="form-control" placeholder="Search by name, category, year or coordinator..." value="{{ query }}">
+        <button class="btn btn-outline-primary" type="submit">Search</button>
+    </div>
+</form>
+
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th><th>Event Name</th><th>Category</th><th>Date</th><th>Academic Year</th>
+            <th>Coordinator</th><th>Participants</th><th>Report</th><th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td>{{ event[0] }}</td>
+            <td>{{ event[1] }}</td>
+            <td>{{ event[4] }}</td>
+            <td>{{ event[2] }}</td>
+            <td>{{ event[3] }}</td>
+            <td>{{ event[5] }}</td>
+            <td>{{ event[9] }}</td>
+            <td><a href="{{ url_for('download_file', filename=event[10]) }}" class="btn btn-sm btn-success">Download</a></td>
+            <td><a href="{{ url_for('delete_record', id=event[0]) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this event?')">Delete</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
