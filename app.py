@@ -6,14 +6,13 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Ensure folders exist
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('database', exist_ok=True)
 
-# Initialize database
 def init_db():
     with sqlite3.connect('database/events.db') as conn:
-        conn.execute('''
+        cursor = conn.cursor()
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT,
@@ -28,9 +27,41 @@ def init_db():
                 report_filename TEXT
             )
         ''')
-init_db()
 
-# Login
+def drop_submitted_by_column():
+    with sqlite3.connect('database/events.db') as conn:
+        cursor = conn.cursor()
+        columns = [col[1] for col in cursor.execute("PRAGMA table_info(events)").fetchall()]
+        if 'submitted_by' in columns:
+            cursor.execute('''
+                CREATE TABLE events_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    date TEXT,
+                    academic_year TEXT,
+                    category TEXT,
+                    coordinator TEXT,
+                    cocoordinator TEXT,
+                    department TEXT,
+                    program TEXT,
+                    participants INTEGER,
+                    report_filename TEXT
+                )
+            ''')
+            cursor.execute('''
+                INSERT INTO events_new (id, name, date, academic_year, category, coordinator,
+                                        cocoordinator, department, program, participants, report_filename)
+                SELECT id, name, date, academic_year, category, coordinator,
+                       cocoordinator, department, program, participants, report_filename
+                FROM events
+            ''')
+            cursor.execute('DROP TABLE events')
+            cursor.execute('ALTER TABLE events_new RENAME TO events')
+            print("✔️ 'submitted_by' column removed successfully.")
+
+init_db()
+drop_submitted_by_column()
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -41,32 +72,34 @@ def login():
         if role == 'admin' and username == 'admin' and password == 'admin123':
             session['user'] = username
             session['role'] = 'admin'
-            return redirect(url_for('view_records'))
-        elif role == 'user' and username == 'user' and password == 'user123':
+            return redirect(url_for('index'))
+        elif role == 'faculty' and username == 'faculty' and password == 'faculty123':
             session['user'] = username
-            session['role'] = 'user'
+            session['role'] = 'faculty'
+            return redirect(url_for('index'))
+        elif role == 'student' and username.startswith('stu') and password == 'student123':
+            session['user'] = username
+            session['role'] = 'student'
             return redirect(url_for('index'))
         else:
             flash("Invalid credentials", "danger")
     return render_template('login.html')
 
-# Logout
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-# Upload Page – User Only
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    if 'role' not in session or session['role'] != 'user':
+    if 'role' not in session:
         return redirect(url_for('login'))
 
     if request.method == 'POST':
         required_fields = ['name', 'date', 'academic_year', 'category', 'coordinator',
                            'cocoordinator', 'department', 'program', 'participants']
         missing_fields = [field for field in required_fields if not request.form.get(field)]
-        
+
         if 'report' not in request.files or request.files['report'].filename == '':
             missing_fields.append('report')
 
@@ -78,24 +111,20 @@ def index():
             'name': request.form['name'],
             'date': request.form['date'],
             'academic_year': request.form['academic_year'],
-            'category': request.form.get('category', ''),
+            'category': request.form['category'],
             'coordinator': request.form['coordinator'],
             'cocoordinator': request.form['cocoordinator'],
             'department': request.form['department'],
             'program': request.form['program'],
-            'participants': request.form['participants'],
+            'participants': request.form['participants']
         }
 
         file = request.files['report']
         filename = file.filename
-
-        # Save to category folder
         category_folder = os.path.join(app.config['UPLOAD_FOLDER'], data['category'])
         os.makedirs(category_folder, exist_ok=True)
-
         filepath = os.path.join(category_folder, filename)
         file.save(filepath)
-
         relative_path = os.path.join(data['category'], filename)
 
         with sqlite3.connect('database/events.db') as conn:
@@ -112,31 +141,36 @@ def index():
 
     return render_template('index.html')
 
-
-# View Records – Admin Only
 @app.route('/records', methods=['GET', 'POST'])
 def view_records():
-    if 'role' not in session or session['role'] != 'admin':
+    if 'role' not in session:
         return redirect(url_for('login'))
 
-    query = ""
-    if request.method == 'POST':
-        query = request.form['search'].strip()
+    search_query = request.form.get('search', '').strip() if request.method == 'POST' else ''
+    selected_category = request.form.get('category', '') if request.method == 'POST' else ''
 
     with sqlite3.connect('database/events.db') as conn:
         cursor = conn.cursor()
-        if query:
-            cursor.execute("""
-                SELECT * FROM events 
-                WHERE name LIKE ? OR category LIKE ? OR academic_year LIKE ? OR coordinator LIKE ?
-            """, (f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'))
-        else:
-            cursor.execute("SELECT * FROM events")
+        query = "SELECT * FROM events WHERE 1=1"
+        params = []
+
+        if search_query:
+            query += " AND (name LIKE ? OR academic_year LIKE ? OR coordinator LIKE ?)"
+            like_term = f"%{search_query}%"
+            params.extend([like_term, like_term, like_term])
+
+        if selected_category and selected_category != "All":
+            query += " AND category = ?"
+            params.append(selected_category)
+
+        cursor.execute(query, params)
         events = cursor.fetchall()
 
-    return render_template('view.html', events=events, query=query)
+    categories = ["All", "Expert talk", "Alumin talk", "Workshop", "Hands on",
+                  "Sports", "Hackathon", "Cultural", "Industrial visit"]
+    return render_template('view.html', events=events, query=search_query,
+                           selected_category=selected_category, categories=categories)
 
-# Delete Record – Admin Only
 @app.route('/delete/<int:id>')
 def delete_record(id):
     if 'role' not in session or session['role'] != 'admin':
@@ -144,16 +178,10 @@ def delete_record(id):
 
     with sqlite3.connect('database/events.db') as conn:
         cursor = conn.cursor()
-
-        # Delete file
         filename = cursor.execute('SELECT report_filename FROM events WHERE id = ?', (id,)).fetchone()
         if filename and os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename[0])):
             os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename[0]))
-
-        # Delete record
         cursor.execute('DELETE FROM events WHERE id = ?', (id,))
-
-        # Rebuild table and reindex
         cursor.execute('CREATE TEMP TABLE events_backup AS SELECT * FROM events')
         cursor.execute('DROP TABLE events')
         cursor.execute('''
@@ -178,17 +206,14 @@ def delete_record(id):
         ''')
         cursor.execute('DROP TABLE events_backup')
 
-    flash("Record deleted successfully and IDs reindexed.", "info")
+    flash("Record deleted and IDs reindexed.", "info")
     return redirect(url_for('view_records'))
 
-# Download – Admin Only
 @app.route('/uploads/<path:filename>')
 def download_file(filename):
-    if 'role' not in session or session['role'] != 'admin':
+    if 'role' not in session:
         return redirect(url_for('login'))
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
-# Run App
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))  # Use Render's PORT if available
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True)
