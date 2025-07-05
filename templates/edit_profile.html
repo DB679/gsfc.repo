@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <h3>Edit User</h3>
+  <form method="POST">
+    <div class="mb-2"><label>Name</label>
+      <input type="text" name="name" class="form-control" value="{{ user[1] }}" required>
+    </div>
+    <div class="mb-2"><label>School</label>
+      <input type="text" name="school" class="form-control" value="{{ user[2] }}" required>
+    </div>
+    <div class="mb-2"><label>Department</label>
+      <input type="text" name="department" class="form-control" value="{{ user[3] }}" required>
+    </div>
+    <div class="mb-2"><label>Program</label>
+      <input type="text" name="program" class="form-control" value="{{ user[4] }}" required>
+    </div>
+    <div class="mb-2"><label>Contact</label>
+      <input type="text" name="contact" class="form-control" value="{{ user[5] }}" required>
+    </div>
+    <div class="mb-2"><label>Email</label>
+      <input type="email" name="email" class="form-control" value="{{ user[6] }}" readonly>
+    </div>
+    <div class="mb-2"><label>Role</label>
+      <select name="role" class="form-select" required>
+        <option value="admin" {% if user[8] == 'admin' %}selected{% endif %}>Admin</option>
+        <option value="faculty" {% if user[8] == 'faculty' %}selected{% endif %}>Faculty</option>
+        <option value="student" {% if user[8] == 'student' %}selected{% endif %}>Student</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Update User</button>
+    <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">Back</a>
+  </form>
+</div>
+{% endblock %}

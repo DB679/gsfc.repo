@@ -16,7 +16,8 @@
               <img src="{{ url_for('static', filename='gsfc_logo.jpg') }}" style="max-width:180px; max-height:80px;">
             </div>
             <h3 class="card-title text-center mb-4">Sign Up</h3>
-            <form id="signupForm" method="POST" action="/signup">
+            <!-- Updated form action -->
+            <form id="signupForm" method="POST" action="/register">
               <div class="mb-3">
                 <label for="name" class="form-label">Name</label>
                 <input type="text" class="form-control" id="name" name="name" required autocomplete="name" />
@@ -111,7 +112,7 @@
 
   schoolSelect.addEventListener('change', function() {
     const selectedSchool = this.value;
-    departmentSelect.innerHTML = '<option value="">Select Branch</option>';
+    departmentSelect.innerHTML = '<option value="">Select Department</option>';
     programSelect.innerHTML = '<option value="">Select Program</option>';
 
     if (branches[selectedSchool]) {
