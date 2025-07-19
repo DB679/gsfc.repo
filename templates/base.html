@@ -1,42 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}GSFC DMS{% endblock %}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSFCU DMS - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .sidebar {
+            width: 250px;
+            height: 100vh;
+            background-color: #191330ff;
+            color: #ffffff;
+            position: fixed;
+            padding-top: 20px;
+        }
+        .sidebar h2 {
+            text-align: center;
+            padding: 10px;
+            color: #4CAF50;
+        }
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .sidebar a:hover, .sidebar a.active {
+            background-color: #a861d4ff;
+        }
+        .sidebar a i {
+            margin-right: 10px;
+        }
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+        }
+        .header {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            background-color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .header input {
+            padding: 5px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .header i {
+            margin-left: 10px;
+            color: #1a252f;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #1a252f;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #ffffff;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            color: #333;
+        }
+        .chart-container {
+            height: 200px;
+        }
+        .btn {
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #fff;
+        }
+        .btn-edit {
+            background-color: #4CAF50;
+        }
+        .btn-delete {
+            background-color: #f44336;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        {% block styles %}{% endblock %}
+    </style>
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <div class="container">
-      <a class="navbar-brand" href="{{ url_for('index') }}">GSFC DMS</a>
-      {% if session.get('user') %}
-        <div class="ms-auto d-flex align-items-center">
-          <span class="navbar-text me-3">
-            Logged in as: {{ session['user'] }} ({{ session['role'] }})
-          </span>
-          <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
-        </div>
-      {% endif %}
+    <div class="sidebar">
+        <img src="{{ url_for('static', filename='gsfc_logo.jpg') }}" class="mb-2" style="display: block; margin: auto; width: 75%">
+        <h2>GSFCU DMS</h2>       
+        <a href="{{ url_for('dashboard') }}" class="{% if request.path == url_for('dashboard') %}active{% endif %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="{{ url_for('view_records') }}" class="{% if request.path == url_for('view_records') %}active{% endif %}"><i class="fas fa-eye"></i> View Records</a>
+        <a href="{{ url_for('index') }}" class="{% if request.path == url_for('index') %}active{% endif %}"><i class="fas fa-plus"></i> Add Event</a>
+        {% if session.get('role') == 'admin' %}
+            <a href="{{ url_for('manage_users') }}" class="{% if request.path == url_for('manage_users') %}active{% endif %}"><i class="fas fa-users-cog"></i> Manage Users</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="{% if request.path == url_for('logout') %}active{% endif %}"><i class="fas fa-sign-out-alt"></i> Logout</a>
     </div>
-  </nav>
 
-  <div class="container mt-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+    <div class="content">
+        <div class="header">
+           
+            <i class="fas fa-bell"></i>
+            
+        </div>
 
-    {% block content %}{% endblock %}
-  </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" style="margin-top: 60px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404;">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  {% block scripts %}{% endblock %}
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {% endblock %}
 </body>
 </html>

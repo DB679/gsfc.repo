@@ -2,57 +2,51 @@
 {% block title %}User Management{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <div class="d-flex justify-content-between mb-3">
-    <h3>User Management</h3>
-    <a href="{{ url_for('index') }}" class="btn btn-sm btn-secondary">← Back</a>
-  </div>
+    <h1>User Management</h1>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-edit" style="margin-bottom: 20px;">← Back</a>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" style="margin-bottom: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-  <table class="table table-bordered">
-    <thead class="table-light">
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>School</th>
-        <th>Branch</th>
-        <th>Program</th>
-        <th>Contact</th>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for user in users %}
-      <tr>
-        <td>{{ user[0] }}</td>
-        <td>{{ user[1] }}</td>
-        <td>{{ user[2] }}</td>
-        <td>{{ user[3] }}</td>
-        <td>{{ user[4] }}</td>
-        <td>{{ user[5] }}</td>
-        <td>{{ user[6] }}</td>
-        <td>{{ user[8] }}</td>
-        <td>
-          <a href="{{ url_for('edit_user', id=user[0]) }}" class="btn btn-sm btn-primary">Edit</a>
-          <a href="{{ url_for('delete_user', id=user[0]) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</a>
-        </td>
-      </tr>
-      {% endfor %}
-      {% if not users %}
-      <tr>
-        <td colspan="9" class="text-center">No users found.</td>
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
-</div>
+    <div class="card">
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>School</th>
+                <th>Branch</th>
+                <th>Program</th>
+                <th>Contact</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+            {% for user in users %}
+            <tr>
+                <td>{{ user[0] }}</td>
+                <td>{{ user[1] }}</td>
+                <td>{{ user[2] }}</td>
+                <td>{{ user[3] }}</td>
+                <td>{{ user[4] }}</td>
+                <td>{{ user[5] }}</td>
+                <td>{{ user[6] }}</td>
+                <td>{{ user[8] }}</td>
+                <td>
+                    <a href="{{ url_for('edit_user', id=user[0]) }}" class="btn btn-edit">Edit</a>
+                    <a href="{{ url_for('delete_user', id=user[0]) }}" class="btn btn-delete" onclick="return confirm('Are you sure?');">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not users %}
+            <tr><td colspan="9">No users found.</td></tr>
+            {% endif %}
+        </table>
+    </div>
 {% endblock %}

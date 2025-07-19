@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div style="display: flex; gap: 30px; justify-content: center;">
+    <div>
+        <h2>Events by School</h2>
+        <div style="width: 350px; height: 350px;">
+            <canvas id="schoolPieChart"></canvas>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-3d@0.8.4/dist/chartjs-chart-3d.min.js"></script>
+        <script>
+            console.log('Chart.js loaded:', typeof Chart !== 'undefined');
+            console.log('Chartjs-chart-3d loaded:', typeof Chart.Chart3D !== 'undefined');
+            console.log('Chart data:', {{ school_event_labels | tojson }}, {{ school_event_counts | tojson }});
+
+            const ctx = document.getElementById('schoolPieChart').getContext('2d');
+            let pieChartConfig = {
+                type: 'pie3d',
+                data: {
+                    labels: {{ school_event_labels | tojson }},
+                    datasets: [{
+                        data: {{ school_event_counts | tojson }},
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'],
+                        borderColor: ['#FFFFFF'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: 'Events by School' }
+                    },
+                    alpha: 0.7,
+                    beta: 0.7,
+                    depth: 50
+                }
+            };
+
+            if (typeof Chart.Chart3D === 'undefined' || !Chart.controllers.pie3d) {
+                console.warn('chartjs-chart-3d not loaded or incompatible, falling back to 2D pie chart');
+                pieChartConfig.type = 'pie';
+                delete pieChartConfig.options.alpha;
+                delete pieChartConfig.options.beta;
+                delete pieChartConfig.options.depth;
+            }
+
+            const pieChart = new Chart(ctx, pieChartConfig);
+        </script>
+    </div>
+
+    <div>
+        <h2>Events by Category</h2>
+        <div style="width: 350px; height: 350px;">
+            <canvas id="categoryBarChart"></canvas>
+        </div>
+        <script>
+            const barCtx = document.getElementById('categoryBarChart').getContext('2d');
+            const barChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: {{ category_labels | tojson }},
+                    datasets: [{
+                        label: 'Occurrences',
+                        data: {{ category_counts | tojson }},
+                        backgroundColor: '#36A2EB',
+                        borderColor: '#FFFFFF',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Events by Category' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
+    </div>
+</div>
+
+<h2>Recent Event Uploads</h2>
+<table border="1">
+    <tr>
+        <th>Event Name</th>
+        <th>School</th>
+        <th>Date</th>
+        <th>Report File</th>
+        <th>Submitted By</th>
+    </tr>
+    {% for activity in recent_activities %}
+    <tr>
+        <td>{{ activity.name }}</td>
+        <td>{{ activity.school }}</td>
+        <td>{{ activity.date }}</td>
+        <td>
+            {% if activity.document_link %}
+            <a href="{{ activity.document_link }}">{{ activity.document }}</a>
+            {% else %}
+            {{ activity.document }}
+            {% endif %}
+        </td>
+        <td>{{ activity.submitted_by }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

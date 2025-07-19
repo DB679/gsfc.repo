@@ -1,129 +1,277 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Records</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-<div class="container py-3">
-  <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
-  <h3 class="mt-2">Event Records</h3>
+{% extends 'base.html' %}
+{% block title %}Event Records{% endblock %}
 
-  <form method="post" class="row g-2 mb-3">
-    <div class="col-md-3 position-relative">
-      <input type="text" id="search" name="search" placeholder="Search" class="form-control" value="{{request.form.search}}" autocomplete="off">
-      <div id="suggestions" class="list-group position-absolute w-100" style="z-index: 10;"></div>
-    </div>
-    <div class="col-md-2">
-      <select name="year" class="form-select">
-        <option value="All" {% if selected_year == 'All' %}selected{% endif %}>All Years</option>
-        {% for y in years %}
-          <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="category" class="form-select">
-        {% for cat in categories %}
-          <option {% if cat == request.form.category %}selected{% endif %}>{{ cat }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="school" class="form-select">
-        <option>All</option>
-        {% for sc in ["School Of Technology", "School Of Management", "School Of Science"] %}
-          <option {% if sc == request.form.school %}selected{% endif %}>{{ sc }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <button class="btn btn-primary w-100">Filter</button>
-    </div>
-    <div class="col-md-1">
-      <a href="{{ url_for('index') }}" class="btn btn-success w-100">Upload</a>
-    </div>
-  </form>
-
-  <script>
-  const searchInput = document.getElementById('search');
-  const suggestionsBox = document.getElementById('suggestions');
-  searchInput.addEventListener('input', function() {
-    const q = this.value;
-    if (q.length < 1) {
-      suggestionsBox.innerHTML = '';
-      return;
-    }
-    fetch(`/search_suggestions?q=${encodeURIComponent(q)}`)
-      .then(r => r.json())
-      .then(data => {
-        suggestionsBox.innerHTML = '';
-        if (data.suggestions && data.suggestions.length) {
-          data.suggestions.forEach(s => {
-            const item = document.createElement('button');
-            item.type = 'button';
-            item.className = 'list-group-item list-group-item-action';
-            item.textContent = s;
-            item.onclick = () => {
-              searchInput.value = s;
-              suggestionsBox.innerHTML = '';
-            };
-            suggestionsBox.appendChild(item);
-          });
+{% block head %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fa;
+            color: #333;
         }
-      });
-  });
-  document.addEventListener('click', function(e) {
-    if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
-      suggestionsBox.innerHTML = '';
-    }
-  });
-  </script>
+        .header {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            background-color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .header i {
+            margin-left: 10px;
+            color: #1a252f;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #1a252f;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #ffffff;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            color: #333;
+        }
+        .btn {
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #fff;
+        }
+        .btn-edit {
+            background-color: #4CAF50;
+        }
+        .btn-delete {
+            background-color: #f44336;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
 
-  <div class="table-responsive">
-    <table class="table table-striped table-bordered">
-      <thead>
-        <tr>
-          {% for h in ['Sr No', 'Name', 'Date', 'Year', 'Category', 'School', 'Coord', 'Co-Coord', 'Branch', 'Prog', 'Part', 'Actions'] %}
-            <th>{{ h }}</th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in events %}
-        <tr>
-          <td>{{ loop.index }}</td>
-          {% for i in range(1, 11) %}
-            <td>{{ e[i] }}</td>
-          {% endfor %}
-          <td>
-            {% if session.role == 'admin' %}
-              <a href="#" class="btn btn-sm btn-success" onclick="confirmDownload('{{ url_for('download', filename=e[11]) }}'); return false;">Download</a>
-            {% endif %}
-            {% if session.role in ['admin', 'faculty'] %}
-              <a href="{{ url_for('edit', id=e[0]) }}" class="btn btn-sm btn-warning">Edit</a>
-            {% endif %}
-            {% if session.role == 'admin' %}
-              <a href="{{ url_for('delete', id=e[0]) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this record?');">Delete</a>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not events %}
-          <tr><td colspan="12" class="text-center">No records.</td></tr>
+        select, input[type="text"], button {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            background-color: #ffffff;
+        }
+
+        /* Vertical filter layout */
+        .filter-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 300px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 3px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+         .filter-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+
+        /* Suggestions dropdown */
+        .suggestions {
+            position: absolute;
+            border: 1px solid #ddd;
+            border-top: none;
+            background-color: #fff;
+            max-height: 150px;
+            overflow-y: auto;
+            width: 200px;
+            z-index: 1000;
+            display: none;
+        }
+        .suggestion-item {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="header">
+        <i class="fas fa-bell"></i>
+        {% if session.get('user') %}
+            <span style="margin-left: 20px;">
+                Logged in as: {{ session['user'] }} ({{ session['role'] }})
+            </span>
         {% endif %}
-      </tbody>
-    </table>
-  </div>
+    </div>
+
+    <div style="margin-top: 60px;">
+        <h1>Event Records</h1>
+
+        <div class="card">
+    <form method="POST" id="filterForm">
+        <div class="filter-panel">
+            <div class="filter-group">
+                <label for="searchInput">Search:</label>
+                <input type="text" id="searchInput" name="search" value="{{ query }}" placeholder="Search events..." autocomplete="off">
+                <div id="suggestions" class="suggestions"></div>
+            </div>
+
+            <div class="filter-group">
+                <label for="yearSelect">Year:</label>
+                <select name="year" id="yearSelect">
+                    <option value="All Years" {% if selected_year == 'All Years' %}selected{% endif %}>All Years</option>
+                    {% for y in years %}
+                        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="categorySelect">Category:</label>
+                <select name="category" id="categorySelect">
+                    <option value="All" {% if selected_category == 'All' %}selected{% endif %}>All</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="schoolSelect">School:</label>
+                <select name="school" id="schoolSelect">
+                    <option value="All" {% if selected_school == 'All' %}selected{% endif %}>All</option>
+                    {% for sc in schools %}
+                        <option value="{{ sc }}" {% if sc == selected_school %}selected{% endif %}>{{ sc }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-buttons">
+                <button type="submit" class="btn btn-edit">Apply Filters</button>
+                <a href="{{ url_for('index') }}" class="btn btn-edit">Upload</a>
+            </div>
+        </div>
+    </form>
 </div>
 
-<script>
-function confirmDownload(url) {
-  if (confirm('Do you want to download this report?')) {
-    window.location.href = url;
-  }
-}
-</script>
-</body>
-</html>
+
+        <div class="card">
+            <table>
+                <tr>
+                    {% for h in ['Sr No', 'Name', 'Date', 'Year', 'Category', 'School', 'Coord', 'Co-Coord', 'Branch', 'Prog', 'Part', 'Actions'] %}
+                        <th>{{ h }}</th>
+                    {% endfor %}
+                </tr>
+                {% for e in events %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    {% for i in range(1, 11) %}
+                        <td>{{ e[i] }}</td>
+                    {% endfor %}
+                    <td>
+                        {% if session.role == 'admin' %}
+                            <a href="{{ url_for('download', filename=e[11]) }}" class="btn btn-edit">Download</a>
+                        {% endif %}
+                        {% if session.role in ['admin', 'faculty'] %}
+                            <a href="{{ url_for('edit', id=e[0]) }}" class="btn btn-edit">Edit</a>
+                        {% endif %}
+                        {% if session.role == 'admin' %}
+                            <a href="{{ url_for('delete', id=e[0]) }}" class="btn btn-delete" onclick="return confirm('Are you sure?');">Delete</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% if not events %}
+                <tr><td colspan="12">No records found.</td></tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const suggestionsDiv = document.getElementById('suggestions');
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value;
+                if (query.length > 0) {
+                    fetch(`/search_suggestions?q=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            suggestionsDiv.innerHTML = '';
+                            if (data.suggestions.length > 0) {
+                                data.suggestions.forEach(suggestion => {
+                                    const div = document.createElement('div');
+                                    div.className = 'suggestion-item';
+                                    div.textContent = suggestion;
+                                    div.addEventListener('click', function() {
+                                        searchInput.value = suggestion;
+                                        suggestionsDiv.style.display = 'none';
+                                        document.getElementById('filterForm').submit();
+                                    });
+                                    suggestionsDiv.appendChild(div);
+                                });
+                                suggestionsDiv.style.display = 'block';
+                            } else {
+                                suggestionsDiv.style.display = 'none';
+                            }
+                        })
+                        .catch(error => console.error('Error fetching suggestions:', error));
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+        });
+    </script>
+{% endblock %}
