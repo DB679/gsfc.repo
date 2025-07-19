@@ -1,7 +1,8 @@
 import os, sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from uuid import uuid4
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -50,7 +51,7 @@ init_db()
 def register():
     if request.method == 'POST':
         name = request.form['name'].strip()
-        school = request.form['school']
+        school = request.form['school'].strip().title()
         department = request.form['department']
         program = request.form['program']
         contact = request.form['contact'].strip()
@@ -71,8 +72,10 @@ def register():
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
                     (name, school, department, program, contact, email, password_hash, role))
                 conn.commit()
-            flash('Registration successful! Please log in.', 'success')
-            return redirect(url_for('login'))
+            session['user'] = email
+            session['role'] = role
+            flash('Registration successful! Welcome to your dashboard.', 'success')
+            return redirect(url_for('dashboard'))
         except sqlite3.IntegrityError:
             flash('Email already exists.', 'danger')
             return redirect(url_for('register'))
@@ -95,7 +98,7 @@ def login():
                 session['user'] = email
                 session['role'] = user[1]
                 flash('Login successful!', 'success')
-                return redirect(url_for('index'))
+                return redirect(url_for('dashboard'))
             flash('Invalid credentials.', 'danger')
         except Exception as e:
             print("LOGIN ERROR:", str(e))
@@ -107,6 +110,64 @@ def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
+
+@app.route('/dashboard')
+def dashboard():
+    if 'role' not in session:
+        return redirect(url_for('login'))
+
+    try:
+        with sqlite3.connect('database/events.db') as conn:
+            # 1. School-wise event counts for Pie Chart
+            school_events = conn.execute('SELECT school, COUNT(*) FROM events GROUP BY school').fetchall()
+            print("DEBUG: School events for pie chart:", school_events)
+            school_event_labels = [row[0] for row in school_events]
+            school_event_counts = [row[1] for row in school_events]
+
+            # 2. Recent Activities
+            recent_data = conn.execute('''
+                SELECT name, school, date, report_filename, submitted_by
+                FROM events
+                ORDER BY id DESC LIMIT 5
+            ''').fetchall()
+            print("DEBUG: Recent events:", recent_data)
+
+            recent_activities = []
+            for name, school, date_str, report_filename, submitted_by in recent_data:
+                try:
+                    months_ago = (datetime.now() - datetime.strptime(date_str, '%Y-%m-%d')).days // 30
+                except:
+                    months_ago = 'N/A'
+                recent_activities.append({
+                    'name': name,
+                    'school': school,
+                    'date': date_str,
+                    'document': report_filename.split('/')[-1] if report_filename else 'N/A',
+                    'document_link': f'/static/Reports/{report_filename}' if report_filename else None,
+                    'submitted_by': submitted_by,
+                    'months_ago': months_ago
+                })
+
+            # 3. Event Category vs Occurrence for Bar Chart
+            category_events = conn.execute('SELECT category, COUNT(*) FROM events GROUP BY category').fetchall()
+            print("DEBUG: Category events for bar chart:", category_events)
+            category_labels = [row[0] for row in category_events]
+            category_counts = [row[1] for row in category_events]
+
+        return render_template(
+            'dashboard.html',
+            school_event_labels=school_event_labels if school_events else [],
+            school_event_counts=school_event_counts if school_events else [],
+            recent_activities=recent_activities,
+            is_admin=session['role'] == 'admin',
+            category_labels=category_labels,
+            category_counts=category_counts
+        )
+
+    except Exception as e:
+        print("DASHBOARD ERROR:", str(e))
+        flash('Error loading dashboard: ' + str(e), 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -120,7 +181,8 @@ def index():
             flash('All fields are required.', 'danger')
             return redirect(url_for('index'))
 
-        data = {field: request.form.get(field) for field in required}
+        data = {field: request.form.get(field).strip() for field in required}
+        data['school'] = data['school'].title()
         file = request.files['report']
         year_folder = os.path.join(app.config['UPLOAD_FOLDER'], data['academic_year'])
         school_folder = os.path.join(year_folder, data['school'].replace(' ', '_'))
@@ -139,14 +201,15 @@ def index():
                         coordinator, cocoordinator, branch, program,
                         participants, report_filename, submitted_by
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (*data.values(), relative_path, session['user'])
-                )
+                    (*data.values(), relative_path, session['user']))
                 conn.commit()
+                print("DEBUG: Event inserted successfully:", data['name'], relative_path)
             flash('Event uploaded successfully.', 'success')
+            return redirect(url_for('dashboard'))
         except Exception as e:
             print("DB INSERT ERROR:", str(e))
             flash('Error uploading event: ' + str(e), 'danger')
-        return redirect(url_for('index'))
+            return redirect(url_for('index'))
 
     return render_template('index.html')
 
@@ -158,25 +221,25 @@ def view_records():
     query = "SELECT * FROM events WHERE 1=1"
     filters = []
     search = request.form.get('search', '').strip()
-    category = request.form.get('category', '')
-    school = request.form.get('school', '')
-    year = request.form.get('year', '')
+    year = request.form.get('year', 'All Years')
+    category = request.form.get('category', 'All')
+    school = request.form.get('school', 'All')
 
     if search:
-        query += " AND (name LIKE ? OR academic_year LIKE ? OR coordinator LIKE ?)"
-        filters += [f'%{search}%'] * 3
+        query += " AND (name LIKE ? OR academic_year LIKE ? OR coordinator LIKE ? OR cocoordinator LIKE ?)"
+        filters.extend([f'%{search}%'] * 4)
 
-    if category and category != 'All':
+    if year != 'All Years':
+        query += " AND academic_year = ?"
+        filters.append(year)
+
+    if category != 'All':
         query += " AND category = ?"
         filters.append(category)
 
-    if school and school != 'All':
+    if school != 'All':
         query += " AND school = ?"
         filters.append(school)
-
-    if year and year != 'All':
-        query += " AND academic_year = ?"
-        filters.append(year)
 
     if session['role'] == 'student':
         query += " AND submitted_by = ?"
@@ -186,8 +249,9 @@ def view_records():
         with sqlite3.connect('database/events.db') as conn:
             events = conn.execute(query, filters).fetchall()
             years = [row[0] for row in conn.execute('SELECT DISTINCT academic_year FROM events ORDER BY academic_year DESC').fetchall()]
-        categories = ["All", "Expert talk", "Alumin talk", "Workshop", "Hands on", "Sports", "Hackathon", "Cultural", "Industrial visit"]
-        return render_template('view.html', events=events, query=search, selected_category=category, categories=categories, years=years, selected_year=year)
+            categories = ["All", "Expert talk", "Alumin talk", "Workshop", "Hands on", "Sports", "Hackathon", "Cultural", "Industrial visit"]
+            schools = ["All", "School Of Technology", "School Of Management", "School Of Science"]
+        return render_template('view.html', events=events, query=search, selected_year=year, categories=categories, years=years, selected_category=category, schools=schools, selected_school=school)
     except Exception as e:
         print("VIEW RECORDS ERROR:", str(e))
         flash('Error loading records: ' + str(e), 'danger')
@@ -200,12 +264,16 @@ def search_suggestions():
     try:
         if term:
             with sqlite3.connect('database/events.db') as conn:
-                rows = conn.execute('SELECT DISTINCT name FROM events WHERE name LIKE ? LIMIT 10', (f'%{term}%',)).fetchall()
+                rows = conn.execute('''
+                    SELECT DISTINCT name FROM events 
+                    WHERE name LIKE ? 
+                    LIMIT 10
+                ''', (f'%{term}%',)).fetchall()
                 suggestions = [row[0] for row in rows]
-        return {'suggestions': suggestions}
+        return jsonify({'suggestions': suggestions})
     except Exception as e:
         print("SEARCH SUGGESTIONS ERROR:", str(e))
-        return {'suggestions': []}
+        return jsonify({'suggestions': []})
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit(id):
@@ -216,10 +284,11 @@ def edit(id):
     try:
         with sqlite3.connect('database/events.db') as conn:
             if request.method == 'POST':
-                updated_data = [request.form[field] for field in [
+                updated_data = [request.form[field].strip() for field in [
                     'name', 'date', 'academic_year', 'category', 'school',
                     'coordinator', 'cocoordinator', 'branch', 'program', 'participants'
                 ]]
+                updated_data[4] = updated_data[4].title()
                 updated_data.append(id)
                 conn.execute('''
                     UPDATE events SET
@@ -261,7 +330,7 @@ def delete(id):
         flash('Error deleting event: ' + str(e), 'danger')
     return redirect(url_for('view_records'))
 
-@app.route('/uploads/<path:filename>')
+@app.route('/Uploads/<path:filename>')
 def download(filename):
     if session.get('role') != 'admin':
         flash('Download not permitted.', 'warning')
@@ -304,7 +373,7 @@ def edit_user(id):
         with sqlite3.connect('database/users.db') as conn:
             if request.method == 'POST':
                 name = request.form['name'].strip()
-                school = request.form['school']
+                school = request.form['school'].strip().title()
                 department = request.form['department']
                 program = request.form['program']
                 contact = request.form['contact'].strip()
